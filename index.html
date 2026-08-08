@@ -1,0 +1,333 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Consulta de posición · Inventario</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<style>
+  /* ============================================================
+     CONFIGURACIÓN: pegá acá la URL de tu Google Sheet publicada
+     como CSV (Archivo > Compartir > Publicar en la web > CSV).
+     Ver README.md del proyecto para el paso a paso.
+     ============================================================ */
+</style>
+</head>
+<body>
+<script>
+  const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTbuqTjbqxUTELEq_xAlxp6Wc9l-_36jP2Pi7wPlYWczzqAmbBYqKJ8zOYQDtp4mljle0cWUQuhZ4Sr/pub?gid=0&single=true&output=csv";
+</script>
+
+<style>
+  :root {
+    --bg: #EDEFEE;
+    --surface: #FFFFFF;
+    --ink: #14181C;
+    --ink-soft: #4A5560;
+    --ink-faint: #8A9199;
+    --accent: #FFC431;
+    --steel: #2B4C6F;
+    --danger: #B23A2E;
+    --border: #D7DBD9;
+    --radius: 6px;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Inter', -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  .mono { font-family: 'IBM Plex Mono', 'Courier New', monospace; }
+
+  .page {
+    max-width: 520px;
+    margin: 0 auto;
+    padding: 18px 16px 40px;
+  }
+
+  /* --- Elemento distintivo: la etiqueta de posición, estilo rótulo de container --- */
+  .tag {
+    position: relative;
+    background: var(--ink);
+    color: #fff;
+    border-radius: var(--radius);
+    padding: 18px 18px 16px;
+    margin-bottom: 6px;
+    overflow: hidden;
+  }
+  .tag::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 6px;
+    background: repeating-linear-gradient(
+      -45deg,
+      var(--accent) 0 10px,
+      var(--ink) 10px 20px
+    );
+  }
+  .tag .eyebrow {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 10px 0 8px;
+  }
+  .tag .posicion {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    line-height: 1.35;
+  }
+  .tag .posicion b {
+    color: var(--accent);
+  }
+
+  .meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 12px;
+    color: var(--ink-faint);
+    padding: 10px 2px 18px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+
+  /* --- Tarjetas de producto, una por fila --- */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 10px;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+  }
+
+  .card .fila-badge {
+    flex: none;
+    width: 46px;
+    height: 46px;
+    border-radius: var(--radius);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 700;
+    font-size: 13px;
+    color: var(--steel);
+  }
+
+  .card .cuerpo {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .card .nombre {
+    font-weight: 600;
+    font-size: 15px;
+    margin: 0 0 2px;
+    word-break: break-word;
+  }
+
+  .card .codigo {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    color: var(--ink-soft);
+    margin: 0 0 8px;
+  }
+
+  .card .fila-datos {
+    display: flex;
+    gap: 18px;
+    margin-bottom: 6px;
+  }
+
+  .card .dato label {
+    display: block;
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--ink-faint);
+    margin-bottom: 1px;
+  }
+
+  .card .dato .valor {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 600;
+    font-size: 15px;
+  }
+
+  .card .detalle {
+    font-size: 13px;
+    color: var(--ink-soft);
+    line-height: 1.4;
+    margin-top: 4px;
+  }
+
+  /* --- Estados: cargando / vacío / error --- */
+  .estado {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 20px;
+    text-align: center;
+    color: var(--ink-soft);
+  }
+  .estado.error {
+    border-color: var(--danger);
+    color: var(--danger);
+  }
+  .estado h2 {
+    font-size: 15px;
+    margin: 0 0 6px;
+    color: inherit;
+  }
+  .estado p {
+    font-size: 13px;
+    margin: 0;
+    line-height: 1.5;
+  }
+  .estado code {
+    font-family: 'IBM Plex Mono', monospace;
+    background: var(--bg);
+    padding: 1px 5px;
+    border-radius: 3px;
+  }
+
+  footer {
+    text-align: center;
+    font-size: 11px;
+    color: var(--ink-faint);
+    margin-top: 22px;
+    font-family: 'IBM Plex Mono', monospace;
+  }
+</style>
+
+<div class="page">
+  <div class="tag">
+    <div class="eyebrow">Posición consultada</div>
+    <div class="posicion" id="posicion-titulo">—</div>
+  </div>
+  <div class="meta">
+    <span id="meta-cantidad"></span>
+    <span id="meta-actualizado"></span>
+  </div>
+
+  <div id="resultado"></div>
+
+  <footer>Gestión de Rags · Inventario</footer>
+</div>
+
+<script>
+  const params = new URLSearchParams(window.location.search);
+  const container = params.get("container");
+  const rag = params.get("rag");
+  const columna = params.get("columna");
+
+  const elTitulo = document.getElementById("posicion-titulo");
+  const elCantidad = document.getElementById("meta-cantidad");
+  const elActualizado = document.getElementById("meta-actualizado");
+  const elResultado = document.getElementById("resultado");
+
+  function mostrarEstado(clase, titulo, texto) {
+    elResultado.innerHTML = `
+      <div class="estado ${clase}">
+        <h2>${titulo}</h2>
+        <p>${texto}</p>
+      </div>`;
+  }
+
+  if (!container || !rag || !columna) {
+    elTitulo.innerHTML = "Falta información";
+    mostrarEstado("error", "El link no incluye la posición",
+      "Este QR debería incluir <code>?container=&rag=&columna=</code> en la URL. Volvé a generarlo desde la app.");
+  } else {
+    elTitulo.innerHTML = `Container <b>${container}</b> · Rag <b>${rag}</b> · Columna <b>${columna}</b>`;
+
+    if (!CSV_URL || CSV_URL.startsWith("PEGA_AQUI")) {
+      mostrarEstado("error", "Falta configurar el origen de datos",
+        "Esta página todavía no tiene cargada la URL del CSV publicado de Google Sheets. Revisá <code>CSV_URL</code> en index.html.");
+    } else {
+      elResultado.innerHTML = `<div class="estado">Cargando inventario…</div>`;
+
+      Papa.parse(CSV_URL, {
+        download: true,
+        header: true,
+        skipEmptyLines: true,
+        complete: function (resultados) {
+          const filas = resultados.data.filter(f =>
+            String(f.Container).trim() === String(container).trim() &&
+            String(f.Rag).trim() === String(rag).trim() &&
+            String(f.Columna).trim() === String(columna).trim()
+          );
+
+          if (filas.length === 0) {
+            mostrarEstado("", "No hay productos cargados acá",
+              "Todavía no se cargó ningún producto para esta columna, o la última sincronización con Sheets no incluyó estos datos.");
+            elCantidad.textContent = "";
+            elActualizado.textContent = "";
+            return;
+          }
+
+          filas.sort((a, b) => String(a.Fila).localeCompare(String(b.Fila)));
+
+          elCantidad.textContent = `${filas.length} posici${filas.length === 1 ? "ón" : "ones"} · ${FILAS_ESPERADAS_LABEL(filas.length)}`;
+          const ultimaActualizacion = filas
+            .map(f => f.Actualizado)
+            .filter(Boolean)
+            .sort()
+            .pop();
+          elActualizado.textContent = ultimaActualizacion ? `Actualizado ${ultimaActualizacion}` : "";
+
+          elResultado.innerHTML = filas.map(f => `
+            <div class="card">
+              <div class="fila-badge">${(f.Fila || "").padStart(2, "0")}</div>
+              <div class="cuerpo">
+                <p class="nombre">${escaparHtml(f.Nombre || "(sin nombre)")}</p>
+                <p class="codigo">${escaparHtml(f.Codigo || "sin código")}</p>
+                <div class="fila-datos">
+                  <div class="dato">
+                    <label>Cantidad</label>
+                    <div class="valor">${escaparHtml(f.Cantidad ?? "0")}</div>
+                  </div>
+                </div>
+                ${f.Detalle ? `<p class="detalle">${escaparHtml(f.Detalle)}</p>` : ""}
+              </div>
+            </div>
+          `).join("");
+        },
+        error: function () {
+          mostrarEstado("error", "No se pudo leer el inventario",
+            "Revisá que la Google Sheet siga publicada en la web como CSV, y que haya conexión a internet.");
+        }
+      });
+    }
+  }
+
+  function escaparHtml(texto) {
+    const div = document.createElement("div");
+    div.textContent = String(texto);
+    return div.innerHTML;
+  }
+
+  function FILAS_ESPERADAS_LABEL(n) {
+    return n === 1 ? "1 fila" : `${n} filas`;
+  }
+</script>
+</body>
+</html>

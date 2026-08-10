@@ -17,7 +17,7 @@
 </head>
 <body>
 <script>
-  const CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTbuqTjbqxUTELEq_xAlxp6Wc9l-_36jP2Pi7wPlYWczzqAmbBYqKJ8zOYQDtp4mljle0cWUQuhZ4Sr/pub?gid=0&single=true&output=csv";
+  const CSV_URL = "PEGA_AQUI_TU_URL_CSV_PUBLICADA";
 </script>
 
 <style>
@@ -270,17 +270,35 @@
         header: true,
         skipEmptyLines: true,
         complete: function (resultados) {
-          const filas = resultados.data.filter(f =>
+          const todasLasFilas = resultados.data.filter(f => f.Container !== undefined);
+          const filas = todasLasFilas.filter(f =>
             String(f.Container).trim() === String(container).trim() &&
             String(f.Rag).trim() === String(rag).trim() &&
             String(f.Columna).trim() === String(columna).trim()
           );
 
           if (filas.length === 0) {
-            mostrarEstado("", "No hay productos cargados acá",
-              "Todavía no se cargó ningún producto para esta columna, o la última sincronización con Sheets no incluyó estos datos.");
             elCantidad.textContent = "";
             elActualizado.textContent = "";
+
+            if (todasLasFilas.length === 0) {
+              // El CSV se pudo leer pero no trajo ninguna fila de datos:
+              // o no se sincronizó todavía, o la publicación no se actualizó.
+              mostrarEstado("error", "El CSV publicado está vacío",
+                "La hoja de Google Sheets no tiene filas de datos (o la publicación no se actualizó). " +
+                "Sincronizá desde la app y confirmá, en Google Sheets, que 'Publicar en la web' tiene tildado " +
+                "<code>Republicar automáticamente cuando se realicen cambios</code>.");
+            } else {
+              // Hay datos en el CSV, pero ninguno coincide con esta posición exacta:
+              // mostramos qué posiciones sí encontró, para comparar rápido.
+              const combos = [...new Set(todasLasFilas.map(f =>
+                `${String(f.Container).trim()}-${String(f.Rag).trim()}-${String(f.Columna).trim()}`
+              ))].slice(0, 10);
+              mostrarEstado("", "No hay productos cargados acá",
+                `Se encontraron ${todasLasFilas.length} filas en total en la hoja, pero ninguna coincide con ` +
+                `Container=${container}, Rag=${rag}, Columna=${columna}. Posiciones encontradas (Container-Rag-Columna): ` +
+                `<code>${combos.join(", ")}${todasLasFilas.length > 10 ? "…" : ""}</code>`);
+            }
             return;
           }
 
